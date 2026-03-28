@@ -102,9 +102,16 @@ function MainTabs({ session, profile }: { session: Session; profile: Profile | n
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: Colors.white, borderTopColor: Colors.border },
+        tabBarStyle: {
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          borderTopWidth: 1,
+          paddingBottom: 4,
+          height: 56,
+        },
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textLight,
+        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', letterSpacing: 0.3 },
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<string, { focused: string; unfocused: string }> = {
             Map: { focused: 'map', unfocused: 'map-outline' },

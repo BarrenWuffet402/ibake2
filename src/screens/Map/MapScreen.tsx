@@ -8,10 +8,11 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../../lib/supabase';
-import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 import { Starter } from '../../types';
 import { haversineDistance } from '../../utils/distance';
 import StarterCard from './StarterCard';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const DEFAULT_RADIUS_KM = 10;
 
@@ -36,12 +37,10 @@ export default function MapScreen({ navigation, route }: any) {
 
   async function loadStarters() {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('starters')
       .select('*, profiles(username, avatar_url)')
       .eq('is_available', true);
-
-    if (error) { setLoading(false); return; }
 
     let filtered = (data ?? []) as Starter[];
     if (userLocation) {
@@ -66,7 +65,7 @@ export default function MapScreen({ navigation, route }: any) {
       .eq('status', 'pending')
       .single();
 
-    if (existing) { Alert.alert('Already requested', 'You already have a pending request for this starter.'); return; }
+    if (existing) { Alert.alert('Already requested', 'You have a pending request for this starter.'); return; }
 
     const { error } = await supabase.from('sharing_requests').insert({
       starter_id: starter.id,
@@ -75,40 +74,40 @@ export default function MapScreen({ navigation, route }: any) {
     });
 
     if (error) { Alert.alert('Error', error.message); return; }
-    Alert.alert('Request Sent!', 'The owner will be notified of your request.');
+    Alert.alert('Request sent', 'The owner will be notified.');
   }
 
-  const mapRegion = userLocation ? {
-    latitude: userLocation.lat,
-    longitude: userLocation.lng,
-    latitudeDelta: 0.15,
-    longitudeDelta: 0.15,
-  } : { latitude: 51.5074, longitude: -0.1278, latitudeDelta: 0.15, longitudeDelta: 0.15 };
+  const mapRegion = userLocation
+    ? { latitude: userLocation.lat, longitude: userLocation.lng, latitudeDelta: 0.15, longitudeDelta: 0.15 }
+    : { latitude: 51.5074, longitude: -0.1278, latitudeDelta: 0.15, longitudeDelta: 0.15 };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Nearby Starters</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.viewToggle}
-            onPress={() => setViewMode(v => v === 'map' ? 'list' : 'map')}>
-            <Ionicons name={viewMode === 'map' ? 'list' : 'map'} size={20} color={Colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('AddStarter', { session })}>
-            <Ionicons name="add" size={20} color={Colors.white} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Starters Nearby"
+        subtitle={`Within ${DEFAULT_RADIUS_KM}km · ${starters.length} available`}
+        ornament="✦ Discover"
+        rightIcon={viewMode === 'map' ? 'list' : 'map'}
+        onRightPress={() => setViewMode(v => v === 'map' ? 'list' : 'map')}
+      />
+
+      {/* Add starter FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddStarter', { session })}
+        activeOpacity={0.85}>
+        <Ionicons name="add" size={22} color={Colors.white} />
+      </TouchableOpacity>
 
       {viewMode === 'map' ? (
         <View style={styles.mapContainer}>
-          <MapView style={styles.map} region={mapRegion} provider={Platform.OS === 'android' ? PROVIDER_DEFAULT : undefined}>
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+            provider={Platform.OS === 'android' ? PROVIDER_DEFAULT : undefined}>
             {userLocation && (
-              <Marker coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }} title="You are here">
-                <View style={styles.userMarker}><Text>📍</Text></View>
+              <Marker coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }} title="You">
+                <View style={styles.userMarker}><Text style={{ fontSize: 16 }}>📍</Text></View>
               </Marker>
             )}
             {starters.map(starter => (
@@ -116,26 +115,30 @@ export default function MapScreen({ navigation, route }: any) {
                 key={starter.id}
                 coordinate={{ latitude: starter.location_lat, longitude: starter.location_lng }}
                 title={starter.name}
-                description={starter.profiles?.username}
-                onCalloutPress={() => navigation.navigate('StarterDetail', { starter, session })}
-              >
-                <View style={styles.starterMarker}><Text style={styles.markerText}>🌾</Text></View>
+                description={`by ${starter.profiles?.username}`}
+                onCalloutPress={() => navigation.navigate('StarterDetail', { starter, session })}>
+                <View style={styles.starterMarker}>
+                  <Text style={styles.markerText}>🌾</Text>
+                </View>
               </Marker>
             ))}
           </MapView>
-          <View style={styles.mapBadge}>
-            <Text style={styles.mapBadgeText}>{starters.length} starters within {DEFAULT_RADIUS_KM}km</Text>
+          <View style={styles.mapLegend}>
+            <Text style={styles.mapLegendText}>✦ Tap a marker to view starter details</Text>
           </View>
         </View>
       ) : loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Searching nearby starters...</Text>
+        </View>
       ) : starters.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>🌾</Text>
           <Text style={styles.emptyTitle}>No starters nearby</Text>
-          <Text style={styles.emptySubtitle}>Be the first to register your starter in this area!</Text>
+          <Text style={styles.emptySubtitle}>Be the first to share your starter with this community</Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('AddStarter', { session })}>
-            <Text style={styles.emptyBtnText}>Add My Starter</Text>
+            <Text style={styles.emptyBtnText}>Register My Starter</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -150,7 +153,7 @@ export default function MapScreen({ navigation, route }: any) {
               isOwn={item.owner_id === session?.user?.id}
             />
           )}
-          contentContainerStyle={{ paddingVertical: Spacing.sm }}
+          contentContainerStyle={styles.list}
         />
       )}
     </View>
@@ -159,40 +162,39 @@ export default function MapScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: Spacing.md, paddingTop: Spacing.lg, backgroundColor: Colors.white,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: Colors.primary },
-  headerActions: { flexDirection: 'row', gap: Spacing.sm },
-  viewToggle: {
-    width: 36, height: 36, borderRadius: Radius.full, backgroundColor: Colors.background,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  addBtn: {
-    width: 36, height: 36, borderRadius: Radius.full, backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
   mapContainer: { flex: 1 },
   map: { flex: 1 },
-  userMarker: { padding: 4, backgroundColor: Colors.white, borderRadius: Radius.full },
+  userMarker: {
+    backgroundColor: Colors.surface, borderRadius: Radius.full, padding: 6,
+    borderWidth: 2, borderColor: Colors.primary, ...Shadow.sm,
+  },
   starterMarker: {
-    backgroundColor: Colors.white, borderRadius: Radius.full,
-    padding: 6, ...Shadow.sm, borderWidth: 2, borderColor: Colors.primary,
+    backgroundColor: Colors.surface, borderRadius: Radius.full, padding: 8,
+    borderWidth: 2, borderColor: Colors.gold, ...Shadow.sm,
   },
-  markerText: { fontSize: 18 },
-  mapBadge: {
-    position: 'absolute', bottom: 20, alignSelf: 'center',
-    backgroundColor: Colors.primary, borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
+  markerText: { fontSize: 20 },
+  mapLegend: {
+    position: 'absolute', bottom: 24, alignSelf: 'center',
+    backgroundColor: Colors.primary + 'EE', borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
   },
-  mapBadgeText: { color: Colors.white, fontSize: 13, fontWeight: '600' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  mapLegendText: { color: Colors.white, fontSize: 12, letterSpacing: 0.5 },
+  fab: {
+    position: 'absolute', bottom: 32, right: 20, zIndex: 10,
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+    ...Shadow.lg,
+  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  loadingText: { ...Typography.caption, letterSpacing: 1 },
+  list: { paddingVertical: Spacing.sm, paddingBottom: 80 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
   emptyEmoji: { fontSize: 64, marginBottom: Spacing.md },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm },
-  emptySubtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.lg },
-  emptyBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
-  emptyBtnText: { color: Colors.white, fontWeight: '700' },
+  emptyTitle: { fontFamily: 'Georgia, serif', fontSize: 22, color: Colors.primary, fontWeight: '700', marginBottom: Spacing.sm },
+  emptySubtitle: { ...Typography.body, textAlign: 'center', marginBottom: Spacing.lg },
+  emptyBtn: {
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, ...Shadow.sm,
+  },
+  emptyBtnText: { color: Colors.white, fontWeight: '700', letterSpacing: 0.5 },
 });

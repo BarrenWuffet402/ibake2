@@ -6,8 +6,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../../lib/supabase';
-import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 import { Recipe } from '../../types';
+import ScreenHeader from '../../components/ScreenHeader';
 
 export default function RecipesScreen({ navigation, route }: any) {
   const session = route.params?.session;
@@ -32,24 +33,29 @@ export default function RecipesScreen({ navigation, route }: any) {
     setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, likes_count: r.likes_count + 1 } : r));
   }
 
-  function renderRecipe({ item }: { item: Recipe }) {
+  function renderRecipe({ item, index }: { item: Recipe; index: number }) {
     const photo = item.photo_urls?.[0];
     const enhanced = item.enhanced_json;
+    const isFeature = index === 0;
+
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, isFeature && styles.cardFeature]}
         onPress={() => navigation.navigate('RecipeDetail', { recipe: item, session })}
-        activeOpacity={0.8}>
+        activeOpacity={0.85}>
+        <View style={styles.cardAccent} />
         {photo ? (
-          <Image source={{ uri: photo }} style={styles.cardPhoto} />
+          <Image source={{ uri: photo }} style={[styles.cardPhoto, isFeature && styles.cardPhotoFeature]} />
         ) : (
-          <View style={styles.cardPhotoPlaceholder}>
+          <View style={[styles.cardPhotoPlaceholder, isFeature && styles.cardPhotoFeature]}>
             <Text style={styles.cardPhotoEmoji}>🍞</Text>
           </View>
         )}
         <View style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+          <View style={styles.cardHeaderRow}>
+            <Text style={[styles.cardTitle, isFeature && styles.cardTitleFeature]} numberOfLines={2}>
+              {item.title}
+            </Text>
             {enhanced && (
               <View style={styles.aiBadge}>
                 <Text style={styles.aiBadgeText}>✨ AI</Text>
@@ -57,15 +63,8 @@ export default function RecipesScreen({ navigation, route }: any) {
             )}
           </View>
           {enhanced?.description && (
-            <Text style={styles.cardDesc} numberOfLines={2}>{enhanced.description}</Text>
+            <Text style={styles.cardDesc} numberOfLines={isFeature ? 3 : 2}>{enhanced.description}</Text>
           )}
-          <View style={styles.cardFooter}>
-            <Text style={styles.cardAuthor}>by {item.profiles?.username ?? 'Unknown'}</Text>
-            <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike(item)}>
-              <Ionicons name="heart-outline" size={16} color={Colors.primary} />
-              <Text style={styles.likeCount}>{item.likes_count}</Text>
-            </TouchableOpacity>
-          </View>
           {enhanced?.tags && enhanced.tags.length > 0 && (
             <View style={styles.tags}>
               {enhanced.tags.slice(0, 3).map((tag, i) => (
@@ -73,6 +72,13 @@ export default function RecipesScreen({ navigation, route }: any) {
               ))}
             </View>
           )}
+          <View style={styles.cardFooter}>
+            <Text style={styles.cardAuthor}>by {item.profiles?.username ?? 'Unknown'}</Text>
+            <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike(item)}>
+              <Ionicons name="heart" size={14} color={Colors.rose} />
+              <Text style={styles.likeCount}>{item.likes_count}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -80,24 +86,27 @@ export default function RecipesScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Community Recipes</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => navigation.navigate('SubmitRecipe', { session })}>
-          <Ionicons name="add" size={20} color={Colors.white} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Community Recipes"
+        subtitle="Crafted & shared by bakers"
+        ornament="✦ Discover"
+        rightIcon="add"
+        rightLabel="Share"
+        onRightPress={() => navigation.navigate('SubmitRecipe', { session })}
+      />
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Gathering recipes...</Text>
+        </View>
       ) : recipes.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>🍞</Text>
           <Text style={styles.emptyTitle}>No recipes yet</Text>
-          <Text style={styles.emptySubtitle}>Share your first sourdough recipe with the community!</Text>
+          <Text style={styles.emptySubtitle}>Be the first to share a sourdough recipe with the community</Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('SubmitRecipe', { session })}>
-            <Text style={styles.emptyBtnText}>Share Recipe</Text>
+            <Text style={styles.emptyBtnText}>Share a Recipe</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -105,7 +114,7 @@ export default function RecipesScreen({ navigation, route }: any) {
           data={recipes}
           keyExtractor={item => item.id}
           renderItem={renderRecipe}
-          contentContainerStyle={{ paddingVertical: Spacing.sm }}
+          contentContainerStyle={styles.list}
         />
       )}
     </View>
@@ -114,47 +123,63 @@ export default function RecipesScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: Spacing.md, paddingTop: Spacing.lg, backgroundColor: Colors.white,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  loadingText: { ...Typography.caption, letterSpacing: 1 },
+  list: { paddingVertical: Spacing.sm, paddingBottom: 32 },
+
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    marginHorizontal: Spacing.md,
+    marginVertical: Spacing.xs,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: Colors.primary },
-  addBtn: {
-    width: 36, height: 36, borderRadius: Radius.full, backgroundColor: Colors.primary,
+  cardFeature: { ...Shadow.md },
+  cardAccent: { height: 3, backgroundColor: Colors.gold, opacity: 0.5 },
+  cardPhoto: { width: '100%', height: 200 },
+  cardPhotoFeature: { height: 240 },
+  cardPhotoPlaceholder: {
+    height: 120, backgroundColor: Colors.backgroundDeep,
     alignItems: 'center', justifyContent: 'center',
   },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: {
-    backgroundColor: Colors.white, borderRadius: Radius.md,
-    marginHorizontal: Spacing.md, marginVertical: Spacing.xs,
-    overflow: 'hidden', ...Shadow.sm,
-  },
-  cardPhoto: { width: '100%', height: 180 },
-  cardPhotoPlaceholder: {
-    height: 100, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center',
-  },
-  cardPhotoEmoji: { fontSize: 40 },
+  cardPhotoEmoji: { fontSize: 48 },
   cardContent: { padding: Spacing.md },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: Colors.text, flex: 1, marginRight: Spacing.sm },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  cardTitle: {
+    fontFamily: 'Georgia, serif', fontSize: 17, fontWeight: '700',
+    color: Colors.primary, flex: 1, marginRight: Spacing.sm,
+  },
+  cardTitleFeature: { fontSize: 20 },
   aiBadge: {
-    backgroundColor: Colors.primary + '15', borderRadius: Radius.sm,
+    backgroundColor: Colors.goldMuted, borderRadius: 4, borderWidth: 1,
+    borderColor: Colors.gold + '40', paddingHorizontal: 6, paddingVertical: 2,
+  },
+  aiBadgeText: { color: Colors.gold, fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  cardDesc: { ...Typography.body, fontSize: 13, marginTop: 6 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', marginTop: Spacing.sm, gap: 4 },
+  tag: {
+    backgroundColor: Colors.primaryMuted, borderRadius: 4,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  aiBadgeText: { color: Colors.primary, fontSize: 11, fontWeight: '700' },
-  cardDesc: { fontSize: 13, color: Colors.textSecondary, marginTop: 4, lineHeight: 18 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
-  cardAuthor: { fontSize: 12, color: Colors.textLight },
+  tagText: { fontSize: 10, color: Colors.primary, fontWeight: '600' },
+  cardFooter: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.borderLight,
+  },
+  cardAuthor: { ...Typography.caption, fontStyle: 'italic' },
   likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  likeCount: { fontSize: 13, color: Colors.primary },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', marginTop: Spacing.xs, gap: 4 },
-  tag: { backgroundColor: Colors.background, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { fontSize: 11, color: Colors.textSecondary },
+  likeCount: { fontSize: 13, color: Colors.rose, fontWeight: '600' },
+
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
   emptyEmoji: { fontSize: 64, marginBottom: Spacing.md },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm },
-  emptySubtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginBottom: Spacing.lg },
-  emptyBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md },
-  emptyBtnText: { color: Colors.white, fontWeight: '700' },
+  emptyTitle: { fontFamily: 'Georgia, serif', fontSize: 22, color: Colors.primary, fontWeight: '700', marginBottom: Spacing.sm },
+  emptySubtitle: { ...Typography.body, textAlign: 'center', marginBottom: Spacing.lg },
+  emptyBtn: {
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
+    paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, ...Shadow.sm,
+  },
+  emptyBtnText: { color: Colors.white, fontWeight: '700', letterSpacing: 0.5 },
 });

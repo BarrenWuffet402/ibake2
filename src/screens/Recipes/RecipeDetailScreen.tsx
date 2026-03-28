@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
-import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 import { Recipe, RecipeComment, EnhancedRecipe } from '../../types';
 
 export default function RecipeDetailScreen({ route }: any) {
@@ -15,17 +15,14 @@ export default function RecipeDetailScreen({ route }: any) {
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
-
   const enhanced = recipe.enhanced_json as EnhancedRecipe | null;
 
   useEffect(() => { loadComments(); }, []);
 
   async function loadComments() {
     const { data } = await supabase
-      .from('recipe_comments')
-      .select('*, profiles(username)')
-      .eq('recipe_id', recipe.id)
-      .order('created_at', { ascending: true });
+      .from('recipe_comments').select('*, profiles(username)')
+      .eq('recipe_id', recipe.id).order('created_at', { ascending: true });
     setComments((data ?? []) as RecipeComment[]);
   }
 
@@ -39,9 +36,7 @@ export default function RecipeDetailScreen({ route }: any) {
     if (!newComment.trim() || !session) return;
     setSubmitting(true);
     const { data } = await supabase.from('recipe_comments').insert({
-      recipe_id: recipe.id,
-      author_id: session.user.id,
-      content: newComment.trim(),
+      recipe_id: recipe.id, author_id: session.user.id, content: newComment.trim(),
     }).select('*, profiles(username)').single();
     if (data) setComments(prev => [...prev, data as RecipeComment]);
     setNewComment('');
@@ -51,27 +46,36 @@ export default function RecipeDetailScreen({ route }: any) {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-        {recipe.photo_urls && recipe.photo_urls.length > 0 && (
+        {recipe.photo_urls && recipe.photo_urls.length > 0 ? (
           <Image source={{ uri: recipe.photo_urls[0] }} style={styles.hero} />
+        ) : (
+          <View style={styles.heroPlaceholder}>
+            <Text style={styles.heroEmoji}>🍞</Text>
+          </View>
         )}
+        <View style={styles.goldStrip} />
 
         <View style={styles.content}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{recipe.title}</Text>
+          {/* Header */}
+          <View style={styles.titleBlock}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{recipe.title}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.author}>by {recipe.profiles?.username ?? 'Unknown Baker'}</Text>
+              <TouchableOpacity style={styles.likeBtn} onPress={handleLike}>
+                <Ionicons name="heart" size={18} color={Colors.rose} />
+                <Text style={styles.likeCount}>{recipe.likes_count}</Text>
+              </TouchableOpacity>
+            </View>
             {enhanced && (
               <View style={styles.aiBadge}>
-                <Text style={styles.aiBadgeText}>✨ AI Enhanced</Text>
+                <Text style={styles.aiBadgeText}>✨ AI Enhanced by OpenAI</Text>
               </View>
             )}
           </View>
 
-          <View style={styles.meta}>
-            <Text style={styles.author}>by {recipe.profiles?.username ?? 'Unknown'}</Text>
-            <TouchableOpacity style={styles.likeBtn} onPress={handleLike}>
-              <Ionicons name="heart" size={18} color={Colors.primary} />
-              <Text style={styles.likeCount}>{recipe.likes_count}</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={styles.divider} />
 
           {enhanced?.description && (
             <Text style={styles.description}>{enhanced.description}</Text>
@@ -87,11 +91,15 @@ export default function RecipeDetailScreen({ route }: any) {
 
           {enhanced ? (
             <>
+              {/* Ingredients */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Ingredients</Text>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionAccent} />
+                  <Text style={styles.sectionTitle}>Ingredients</Text>
+                </View>
                 {enhanced.ingredients.map((ing, i) => (
                   <View key={i} style={styles.ingredientRow}>
-                    <View style={styles.bullet} />
+                    <View style={styles.ingredientBullet} />
                     <Text style={styles.ingredientText}>
                       <Text style={styles.ingredientAmount}>{ing.amount} {ing.unit} </Text>
                       {ing.item}
@@ -100,8 +108,12 @@ export default function RecipeDetailScreen({ route }: any) {
                 ))}
               </View>
 
+              {/* Method */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Method</Text>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionAccent} />
+                  <Text style={styles.sectionTitle}>Method</Text>
+                </View>
                 {enhanced.steps.map((step, i) => (
                   <View key={i} style={styles.stepCard}>
                     <View style={styles.stepNumber}>
@@ -111,7 +123,8 @@ export default function RecipeDetailScreen({ route }: any) {
                       <Text style={styles.stepInstruction}>{step.instruction}</Text>
                       {step.tip && (
                         <View style={styles.tipBox}>
-                          <Text style={styles.tipText}>💡 {step.tip}</Text>
+                          <Ionicons name="bulb-outline" size={13} color={Colors.gold} />
+                          <Text style={styles.tipText}>{step.tip}</Text>
                         </View>
                       )}
                     </View>
@@ -120,7 +133,7 @@ export default function RecipeDetailScreen({ route }: any) {
               </View>
 
               {recipe.original_text && (
-                <TouchableOpacity onPress={() => setShowOriginal(v => !v)} style={styles.toggleOriginal}>
+                <TouchableOpacity style={styles.toggleOriginal} onPress={() => setShowOriginal(v => !v)}>
                   <Text style={styles.toggleOriginalText}>
                     {showOriginal ? '▲ Hide' : '▼ Show'} original recipe
                   </Text>
@@ -138,27 +151,38 @@ export default function RecipeDetailScreen({ route }: any) {
             </View>
           )}
 
+          {/* Comments */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionAccent} />
+              <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
+            </View>
             {comments.map(comment => (
               <View key={comment.id} style={styles.commentCard}>
-                <Text style={styles.commentAuthor}>{comment.profiles?.username ?? 'Unknown'}</Text>
-                <Text style={styles.commentContent}>{comment.content}</Text>
+                <View style={styles.commentAvatar}>
+                  <Text style={styles.commentAvatarText}>
+                    {comment.profiles?.username?.[0]?.toUpperCase() ?? '?'}
+                  </Text>
+                </View>
+                <View style={styles.commentBody}>
+                  <Text style={styles.commentAuthor}>{comment.profiles?.username ?? 'Unknown'}</Text>
+                  <Text style={styles.commentContent}>{comment.content}</Text>
+                </View>
               </View>
             ))}
             {session && (
-              <View style={styles.commentInput}>
+              <View style={styles.commentInputRow}>
                 <TextInput
                   style={styles.commentField}
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  placeholder="Add a comment..."
-                  placeholderTextColor={Colors.textLight}
+                  value={newComment} onChangeText={setNewComment}
+                  placeholder="Share your thoughts..."
+                  placeholderTextColor={Colors.textMuted}
                   multiline
                 />
                 <TouchableOpacity style={styles.sendBtn} onPress={handleComment} disabled={submitting}>
-                  {submitting ? <ActivityIndicator size="small" color={Colors.white} /> :
-                    <Ionicons name="send" size={16} color={Colors.white} />}
+                  {submitting
+                    ? <ActivityIndicator size="small" color={Colors.white} />
+                    : <Ionicons name="send" size={15} color={Colors.white} />}
                 </TouchableOpacity>
               </View>
             )}
@@ -171,63 +195,96 @@ export default function RecipeDetailScreen({ route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  hero: { width: '100%', height: 260 },
-  content: { padding: Spacing.lg },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.primary, flex: 1, marginRight: Spacing.sm },
-  aiBadge: {
-    backgroundColor: Colors.primary + '15', borderRadius: Radius.sm,
-    paddingHorizontal: 8, paddingVertical: 4,
+  hero: { width: '100%', height: 300 },
+  heroPlaceholder: {
+    height: 200, backgroundColor: Colors.backgroundDeep, alignItems: 'center', justifyContent: 'center',
   },
-  aiBadgeText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
-  meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
-  author: { fontSize: 13, color: Colors.textLight },
-  likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  likeCount: { fontSize: 15, color: Colors.primary, fontWeight: '600' },
-  description: { fontSize: 15, color: Colors.textSecondary, marginTop: Spacing.md, lineHeight: 22 },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', marginTop: Spacing.sm, gap: 4 },
-  tag: { backgroundColor: Colors.background, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { fontSize: 12, color: Colors.textSecondary },
-  section: { marginTop: Spacing.xl },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.text, marginBottom: Spacing.md },
+  heroEmoji: { fontSize: 72 },
+  goldStrip: { height: 4, backgroundColor: Colors.gold, opacity: 0.5 },
+  content: { padding: Spacing.lg },
+
+  titleBlock: { marginBottom: Spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  title: { fontFamily: 'Georgia, serif', fontSize: 28, fontWeight: '700', color: Colors.primary, flex: 1 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  author: { ...Typography.body, fontSize: 14, fontStyle: 'italic' },
+  likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  likeCount: { fontSize: 16, color: Colors.rose, fontWeight: '700' },
+  aiBadge: {
+    alignSelf: 'flex-start', marginTop: Spacing.sm,
+    backgroundColor: Colors.goldMuted, borderRadius: Radius.sm, borderWidth: 1,
+    borderColor: Colors.gold + '50', paddingHorizontal: Spacing.sm, paddingVertical: 4,
+  },
+  aiBadgeText: { color: Colors.gold, fontSize: 12, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
+  description: { ...Typography.body, fontSize: 15, marginBottom: Spacing.md },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.md },
+  tag: {
+    backgroundColor: Colors.primaryMuted, borderRadius: 4,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  tagText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
+
+  section: { marginTop: Spacing.lg },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md, gap: Spacing.sm },
+  sectionAccent: { width: 4, height: 20, backgroundColor: Colors.gold, borderRadius: 2 },
+  sectionTitle: { fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: '700', color: Colors.text },
+
   ingredientRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: Spacing.sm },
-  bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary, marginTop: 7, marginRight: Spacing.sm },
-  ingredientText: { fontSize: 15, color: Colors.text, flex: 1 },
-  ingredientAmount: { fontWeight: '600', color: Colors.primary },
+  ingredientBullet: {
+    width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.gold,
+    marginTop: 8, marginRight: Spacing.sm, flexShrink: 0,
+  },
+  ingredientText: { ...Typography.body, fontSize: 15, flex: 1 },
+  ingredientAmount: { fontWeight: '700', color: Colors.primary },
+
   stepCard: { flexDirection: 'row', marginBottom: Spacing.md },
   stepNumber: {
-    width: 28, height: 28, borderRadius: Radius.full, backgroundColor: Colors.primary,
+    width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md, marginTop: 2, flexShrink: 0,
   },
   stepNumberText: { color: Colors.white, fontSize: 13, fontWeight: '800' },
   stepContent: { flex: 1 },
-  stepInstruction: { fontSize: 15, color: Colors.text, lineHeight: 22 },
+  stepInstruction: { ...Typography.body, fontSize: 15 },
   tipBox: {
-    backgroundColor: Colors.accent + '15', borderRadius: Radius.sm,
-    padding: Spacing.sm, marginTop: Spacing.sm, borderLeftWidth: 3, borderLeftColor: Colors.accent,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    backgroundColor: Colors.goldMuted, borderRadius: Radius.sm,
+    padding: Spacing.sm, marginTop: Spacing.sm,
+    borderLeftWidth: 3, borderLeftColor: Colors.gold,
   },
-  tipText: { fontSize: 13, color: Colors.accent, lineHeight: 18 },
-  toggleOriginal: { marginTop: Spacing.md },
-  toggleOriginalText: { color: Colors.textLight, fontSize: 13 },
+  tipText: { fontSize: 13, color: Colors.textSecondary, flex: 1, lineHeight: 18 },
+
+  toggleOriginal: { marginTop: Spacing.md, alignSelf: 'flex-start' },
+  toggleOriginalText: { color: Colors.textMuted, fontSize: 13 },
   originalBox: {
-    backgroundColor: Colors.white, borderRadius: Radius.md, padding: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.md,
     marginTop: Spacing.sm, borderWidth: 1, borderColor: Colors.border,
   },
-  originalText: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21 },
+  originalText: { ...Typography.body, fontSize: 14 },
+
   commentCard: {
-    backgroundColor: Colors.white, borderRadius: Radius.md, padding: Spacing.md,
-    marginBottom: Spacing.sm, ...Shadow.sm,
+    flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.md,
+    padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm,
   },
-  commentAuthor: { fontSize: 13, fontWeight: '700', color: Colors.primary, marginBottom: 2 },
-  commentContent: { fontSize: 14, color: Colors.text },
-  commentInput: {
+  commentAvatar: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm, flexShrink: 0,
+  },
+  commentAvatarText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+  commentBody: { flex: 1 },
+  commentAuthor: { fontSize: 13, fontWeight: '700', color: Colors.primary, marginBottom: 3 },
+  commentContent: { ...Typography.body, fontSize: 14 },
+  commentInputRow: {
     flexDirection: 'row', alignItems: 'flex-end', marginTop: Spacing.md,
-    backgroundColor: Colors.white, borderRadius: Radius.md, padding: Spacing.sm,
-    ...Shadow.sm,
+    backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.sm,
+    borderWidth: 1, borderColor: Colors.border, ...Shadow.sm, gap: Spacing.sm,
   },
-  commentField: { flex: 1, fontSize: 14, color: Colors.text, maxHeight: 80, padding: Spacing.xs },
+  commentField: {
+    flex: 1, fontSize: 14, color: Colors.text, maxHeight: 80,
+    padding: Spacing.xs, fontFamily: 'Georgia, serif',
+  },
   sendBtn: {
-    width: 36, height: 36, borderRadius: Radius.full, backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center', marginLeft: Spacing.sm,
+    width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
   },
 });

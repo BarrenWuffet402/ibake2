@@ -6,35 +6,16 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
-import { Colors, Spacing, Radius, Shadow } from '../../constants/theme';
+import { Colors, Spacing, Radius, Shadow, Typography } from '../../constants/theme';
 import { EnhancedRecipe } from '../../types';
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? '';
 
 async function enhanceRecipeWithAI(title: string, ingredients: string, steps: string): Promise<EnhancedRecipe | null> {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2048,
-        system: `You are a professional baker and recipe editor. The user will submit a raw recipe. Your job is to: 1) Fix any unclear steps, 2) Standardize ingredient measurements, 3) Add helpful tips where appropriate, 4) Structure it with clear sections: Ingredients, Method, Tips. Return valid JSON with fields: title, description, ingredients (array of {amount, unit, item}), steps (array of {step_number, instruction, tip?}), tags (array of strings). Return ONLY the JSON object with no markdown or explanation.`,
-        messages: [{
-          role: 'user',
-          content: `Title: ${title}\n\nIngredients:\n${ingredients}\n\nSteps:\n${steps}`,
-        }],
-      }),
+    const { data, error } = await supabase.functions.invoke('enhance-recipe', {
+      body: { title, ingredients, steps },
     });
-
-    if (!response.ok) return null;
-    const data = await response.json();
-    const text = data.content[0].text;
-    return JSON.parse(text) as EnhancedRecipe;
+    if (error || !data) return null;
+    return data as EnhancedRecipe;
   } catch {
     return null;
   }
@@ -50,11 +31,9 @@ export default function SubmitRecipeScreen({ navigation, route }: any) {
   const [enhancing, setEnhancing] = useState(false);
 
   async function pickPhoto() {
-    if (photoUris.length >= 3) { Alert.alert('Max 3 photos'); return; }
+    if (photoUris.length >= 3) { Alert.alert('Maximum 3 photos'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.7,
     });
     if (!result.canceled) setPhotoUris(prev => [...prev, result.assets[0].uri]);
   }
@@ -76,7 +55,7 @@ export default function SubmitRecipeScreen({ navigation, route }: any) {
   }
 
   async function handleSubmit() {
-    if (!title || !ingredients || !steps) { Alert.alert('Error', 'Please fill in title, ingredients, and steps.'); return; }
+    if (!title || !ingredients || !steps) { Alert.alert('Missing fields', 'Please fill in title, ingredients, and steps'); return; }
     if (!session) { Alert.alert('Please sign in'); return; }
     setLoading(true);
     setEnhancing(true);
@@ -87,71 +66,83 @@ export default function SubmitRecipeScreen({ navigation, route }: any) {
     const photoUrls = await uploadPhotos();
     const originalText = `${title}\n\nIngredients:\n${ingredients}\n\nSteps:\n${steps}`;
 
-    const { data, error } = await supabase.from('recipes').insert({
+    const { error } = await supabase.from('recipes').insert({
       author_id: session.user.id,
       title: enhanced?.title ?? title,
       original_text: originalText,
       enhanced_json: enhanced ?? null,
       photo_urls: photoUrls.length > 0 ? photoUrls : null,
-    }).select().single();
+    });
 
     setLoading(false);
     if (error) { Alert.alert('Error', error.message); return; }
-    if (!enhanced) Alert.alert('Note', 'AI enhancement failed. Recipe saved with original content.');
-    else Alert.alert('Recipe Published!', '✨ Your recipe has been AI-enhanced and published.');
+    if (!enhanced) Alert.alert('Saved', 'Recipe saved. AI enhancement unavailable right now.');
+    else Alert.alert('Published!', '✨ Your recipe has been AI-enhanced and shared.');
     navigation.goBack();
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Share a Recipe</Text>
+      <View style={styles.titleBlock}>
+        <Text style={styles.title}>Share a Recipe</Text>
+        <Text style={styles.subtitle}>Your knowledge, beautifully preserved</Text>
+        <View style={styles.ornamentRow}>
+          <View style={styles.ornamentLine} />
+          <Text style={styles.ornamentDot}>✦</Text>
+          <View style={styles.ornamentLine} />
+        </View>
+      </View>
 
-      <Text style={styles.label}>Recipe Title *</Text>
-      <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Classic Sourdough Loaf" placeholderTextColor={Colors.textLight} />
+      <View style={styles.section}>
+        <Text style={styles.label}>Recipe Title *</Text>
+        <TextInput style={styles.input} value={title} onChangeText={setTitle}
+          placeholder="e.g. Norwegian Rye Sourdough" placeholderTextColor={Colors.textMuted} />
 
-      <Text style={styles.label}>Ingredients *</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        value={ingredients} onChangeText={setIngredients}
-        placeholder="500g bread flour&#10;375ml water&#10;10g salt&#10;100g active starter"
-        placeholderTextColor={Colors.textLight} multiline numberOfLines={6}
-      />
+        <Text style={styles.label}>Ingredients *</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]} value={ingredients} onChangeText={setIngredients}
+          placeholder={"500g bread flour\n375ml water\n10g salt\n100g active starter"}
+          placeholderTextColor={Colors.textMuted} multiline numberOfLines={6}
+        />
 
-      <Text style={styles.label}>Steps *</Text>
-      <TextInput
-        style={[styles.input, styles.textAreaLarge]}
-        value={steps} onChangeText={setSteps}
-        placeholder="1. Mix flour and water, rest 30min&#10;2. Add starter and salt..."
-        placeholderTextColor={Colors.textLight} multiline numberOfLines={8}
-      />
+        <Text style={styles.label}>Method / Steps *</Text>
+        <TextInput
+          style={[styles.input, styles.textAreaLarge]} value={steps} onChangeText={setSteps}
+          placeholder={"1. Mix flour and water, rest 30min\n2. Add starter and salt...\n3. Fold every 30 min x4"}
+          placeholderTextColor={Colors.textMuted} multiline numberOfLines={8}
+        />
+      </View>
 
-      <Text style={styles.label}>Photos (up to 3)</Text>
-      <View style={styles.photosRow}>
-        {photoUris.map((uri, i) => (
-          <View key={i} style={styles.photoContainer}>
-            <Image source={{ uri }} style={styles.photoThumb} />
-            <TouchableOpacity style={styles.removePhoto} onPress={() => setPhotoUris(prev => prev.filter((_, j) => j !== i))}>
-              <Ionicons name="close-circle" size={20} color={Colors.error} />
+      <View style={styles.section}>
+        <Text style={styles.label}>Photos (up to 3)</Text>
+        <View style={styles.photosRow}>
+          {photoUris.map((uri, i) => (
+            <View key={i} style={styles.photoContainer}>
+              <Image source={{ uri }} style={styles.photoThumb} />
+              <TouchableOpacity style={styles.removePhoto} onPress={() => setPhotoUris(prev => prev.filter((_, j) => j !== i))}>
+                <Ionicons name="close-circle" size={20} color={Colors.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {photoUris.length < 3 && (
+            <TouchableOpacity style={styles.addPhoto} onPress={pickPhoto} activeOpacity={0.8}>
+              <Ionicons name="camera-outline" size={22} color={Colors.textMuted} />
+              <Text style={styles.addPhotoText}>Add photo</Text>
             </TouchableOpacity>
-          </View>
-        ))}
-        {photoUris.length < 3 && (
-          <TouchableOpacity style={styles.addPhoto} onPress={pickPhoto}>
-            <Ionicons name="camera-outline" size={24} color={Colors.textLight} />
-            <Text style={styles.addPhotoText}>Add</Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </View>
       </View>
 
       <View style={styles.aiNote}>
-        <Text style={styles.aiNoteText}>✨ Your recipe will be automatically enhanced by AI</Text>
+        <Ionicons name="sparkles-outline" size={16} color={Colors.gold} />
+        <Text style={styles.aiNoteText}>Your recipe will be professionally enhanced by AI before publishing</Text>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
         {loading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator color={Colors.white} />
-            <Text style={styles.buttonText}>{enhancing ? ' Enhancing with AI...' : ' Saving...'}</Text>
+            <Text style={styles.buttonText}>{enhancing ? '  Enhancing with AI...' : '  Publishing...'}</Text>
           </View>
         ) : (
           <Text style={styles.buttonText}>Publish Recipe</Text>
@@ -164,32 +155,50 @@ export default function SubmitRecipeScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.primary, marginBottom: Spacing.lg },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: Spacing.xs, marginTop: Spacing.md },
+
+  titleBlock: { marginBottom: Spacing.lg },
+  title: { fontFamily: 'Georgia, serif', fontSize: 24, fontWeight: '700', color: Colors.primary },
+  subtitle: { ...Typography.body, fontSize: 14, marginTop: 4 },
+  ornamentRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, gap: Spacing.sm },
+  ornamentLine: { flex: 1, height: 1, backgroundColor: Colors.gold, opacity: 0.35 },
+  ornamentDot: { color: Colors.gold, fontSize: 11 },
+
+  section: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md,
+    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border, ...Shadow.sm,
+  },
+  label: { ...Typography.label, marginBottom: Spacing.xs, marginTop: Spacing.sm },
   input: {
     borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
-    padding: Spacing.md, fontSize: 16, color: Colors.text, backgroundColor: Colors.white,
+    padding: Spacing.md, fontSize: 15, color: Colors.text,
+    backgroundColor: Colors.background, fontFamily: 'Georgia, serif',
   },
-  textArea: { height: 120, textAlignVertical: 'top' },
-  textAreaLarge: { height: 180, textAlignVertical: 'top' },
+  textArea: { height: 130, textAlignVertical: 'top' },
+  textAreaLarge: { height: 190, textAlignVertical: 'top' },
+
   photosRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginTop: Spacing.xs },
   photoContainer: { position: 'relative' },
   photoThumb: { width: 80, height: 80, borderRadius: Radius.md },
   removePhoto: { position: 'absolute', top: -8, right: -8 },
   addPhoto: {
     width: 80, height: 80, borderRadius: Radius.md, borderWidth: 2, borderColor: Colors.border,
-    borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white,
+    borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.backgroundDeep, gap: 4,
   },
-  addPhotoText: { fontSize: 12, color: Colors.textLight, marginTop: 2 },
+  addPhotoText: { fontSize: 10, color: Colors.textMuted, fontWeight: '600' },
+
   aiNote: {
-    backgroundColor: Colors.primary + '10', borderRadius: Radius.md,
-    padding: Spacing.md, marginTop: Spacing.lg, borderLeftWidth: 3, borderLeftColor: Colors.primary,
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.goldMuted, borderRadius: Radius.md, padding: Spacing.md,
+    marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.gold + '30',
+    borderLeftWidth: 3, borderLeftColor: Colors.gold,
   },
-  aiNoteText: { color: Colors.primary, fontSize: 14 },
+  aiNoteText: { color: Colors.textSecondary, fontSize: 13, flex: 1 },
+
   button: {
-    backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Spacing.md,
-    alignItems: 'center', marginTop: Spacing.xl,
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
+    padding: Spacing.md + 2, alignItems: 'center', ...Shadow.md,
   },
   loadingRow: { flexDirection: 'row', alignItems: 'center' },
-  buttonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  buttonText: { color: Colors.white, fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
 });
