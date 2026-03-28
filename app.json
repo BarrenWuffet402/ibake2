@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ibake",
+    "name": "iBake",
     "slug": "ibake",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,22 +9,61 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FAF7F2"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "iBake uses your location to find nearby sourdough starters.",
+        "NSCameraUsageDescription": "iBake uses your camera to take photos of your starter.",
+        "NSPhotoLibraryUsageDescription": "iBake accesses your photo library to add photos to your starter and recipes."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FAF7F2",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "iBake uses your location to find nearby sourdough starters."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#8B5E3C"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "iBake accesses your photo library to add photos to starters and recipes.",
+          "cameraPermission": "iBake uses your camera to take photos of your starter."
+        }
+      ]
+    ]
   }
 }
