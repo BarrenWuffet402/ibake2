@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iBake · Sourdough Starter Map · Oslo</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    /* ── Vintage Autumn Palette (matches app) ───────────────────────────── */
+    :root {
+      --bg:          #F2E8D9;
+      --bg-deep:     #EAD9C4;
+      --surface:     #FBF6EE;
+      --primary:     #7B3F2B;
+      --primary-dk:  #5C2D1E;
+      --accent:      #4A6741;
+      --gold:        #B8873A;
+      --gold-lt:     #D4A85A;
+      --rose:        #B87469;
+      --text:        #2A1A0E;
+      --text-sec:    #5C3D2E;
+      --text-muted:  #9B7B6A;
+      --border:      #DDD0BE;
+      --divider:     #D4C4AE;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top Bar ─────────────────────────────────────────────────────────── */
+    .topbar {
+      background: var(--surface);
+      border-bottom: 2px solid var(--gold);
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 12px rgba(92,45,30,0.10);
+      position: relative;
+      z-index: 1000;
+    }
+
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .topbar-logo {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 2px 8px rgba(92,45,30,0.25);
+    }
+
+    .topbar-title {
+      font-family: Georgia, serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: 0.3px;
+    }
+
+    .topbar-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .topbar-badge {
+      background: var(--gold);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .stat-pill {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--text-sec);
+      font-weight: 600;
+    }
+
+    .stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(74,103,65,0.2);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 3px rgba(74,103,65,0.2); }
+      50%       { transform: scale(1.2); box-shadow: 0 0 0 5px rgba(74,103,65,0.1); }
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .layout {
+      flex: 1;
+      display: flex;
+      height: calc(100vh - 64px);
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 340px;
+      min-width: 340px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 20px 20px 12px;
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .sidebar-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-title {
+      font-family: Georgia, serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .sidebar-count {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: var(--bg-deep);
+      padding: 3px 10px;
+      border-radius: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-chip {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      background: var(--bg);
+      color: var(--text-sec);
+      transition: all 0.15s;
+    }
+
+    .filter-chip.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .filter-chip:hover:not(.active) {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .starter-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .starter-list::-webkit-scrollbar { width: 4px; }
+    .starter-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .starter-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .starter-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--gold);
+      opacity: 0.5;
+    }
+
+    .starter-card:hover {
+      border-color: var(--gold);
+      box-shadow: 0 4px 16px rgba(92,45,30,0.12);
+      transform: translateY(-1px);
+    }
+
+    .starter-card.selected {
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 4px 20px rgba(123,63,43,0.18);
+    }
+
+    .starter-card.selected::before { opacity: 1; }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .card-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      border: 2px solid var(--gold);
+    }
+
+    .card-info { flex: 1; }
+
+    .card-name {
+      font-family: Georgia, serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 2px;
+    }
+
+    .card-owner {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-bottom: 6px;
+    }
+
+    .card-tags {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .card-tag {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-sec);
+      letter-spacing: 0.3px;
+    }
+
+    .card-tag.age { border-color: var(--gold); color: var(--gold); background: rgba(184,135,58,0.08); }
+    .card-tag.hydration { border-color: var(--accent); color: var(--accent); background: rgba(74,103,65,0.08); }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text-sec);
+      line-height: 1.6;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--divider);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .card-dist {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .avail-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .request-btn {
+      background: var(--primary);
+      color: #FBF6EE;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-transform: uppercase;
+    }
+
+    .request-btn:hover {
+      background: var(--primary-dk);
+      transform: scale(1.03);
+    }
+
+    /* ── Map Container ───────────────────────────────────────────────────── */
+    .map-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Map UI Overlays ─────────────────────────────────────────────────── */
+    .map-filter-bar {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 800;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 4px 20px rgba(92,45,30,0.15);
+      white-space: nowrap;
+    }
+
+    .map-filter-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .map-filter-stat {
+      font-size: 13px;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .map-filter-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--divider);
+    }
+
+    .map-fab {
+      position: absolute;
+      bottom: 28px;
+      right: 24px;
+      z-index: 800;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 28px;
+      padding: 14px 22px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      box-shadow: 0 6px 24px rgba(92,45,30,0.30);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .map-fab:hover {
+      background: var(--primary-dk);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(92,45,30,0.35);
+    }
+
+    .map-legend {
+      position: absolute;
+      bottom: 28px;
+      left: 24px;
+      z-index: 800;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 16px rgba(92,45,30,0.12);
+    }
+
+    .legend-title {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: var(--text-sec);
+    }
+
+    .legend-icon { font-size: 14px; }
+
+    /* ── Popup ───────────────────────────────────────────────────────────── */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface) !important;
+      border-radius: 16px !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: 0 8px 32px rgba(92,45,30,0.18) !important;
+      padding: 0 !important;
+      overflow: hidden;
+    }
+
+    .leaflet-popup-tip { background: var(--surface) !important; }
+
+    .leaflet-popup-content {
+      margin: 0 !important;
+      width: 260px !important;
+    }
+
+    .popup-accent { height: 4px; background: var(--gold); }
+
+    .popup-body { padding: 14px; }
+
+    .popup-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+    .popup-emoji {
+      width: 42px; height: 42px;
+      background: var(--primary);
+      border-radius: 21px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      border: 2px solid var(--gold);
+      flex-shrink: 0;
+    }
+
+    .popup-name {
+      font-family: Georgia, serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 2px;
+    }
+
+    .popup-owner { font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+    .popup-stats {
+      display: flex; gap: 8px; margin-bottom: 10px;
+    }
+
+    .popup-stat {
+      flex: 1; background: var(--bg-deep); border-radius: 8px; padding: 6px 10px; text-align: center;
+    }
+
+    .popup-stat-val { font-size: 14px; font-weight: 800; color: var(--primary); }
+    .popup-stat-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: var(--text-muted); text-transform: uppercase; margin-top: 1px; }
+
+    .popup-desc { font-size: 12px; color: var(--text-sec); line-height: 1.6; margin-bottom: 12px; }
+
+    .popup-btn {
+      display: block;
+      width: 100%;
+      background: var(--primary);
+      color: #FBF6EE;
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s;
+    }
+
+    .popup-btn:hover { background: var(--primary-dk); }
+
+    /* ── Leaflet custom marker ───────────────────────────────────────────── */
+    .starter-marker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .marker-bubble {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      background: var(--surface);
+      border: 3px solid var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 16px rgba(92,45,30,0.30);
+      transition: transform 0.2s;
+    }
+
+    .marker-bubble:hover { transform: scale(1.15); }
+    .marker-bubble.selected { border-color: var(--primary); background: var(--primary); }
+
+    .marker-tail {
+      width: 2px;
+      height: 10px;
+      background: var(--gold);
+      margin-top: -2px;
+    }
+
+    .marker-tail.selected { background: var(--primary); }
+
+    .user-marker {
+      width: 18px; height: 18px;
+      border-radius: 9px;
+      background: #3B82F6;
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 4px rgba(59,130,246,0.25), 0 4px 12px rgba(59,130,246,0.35);
+      animation: user-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes user-pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(59,130,246,0.25), 0 4px 12px rgba(59,130,246,0.35); }
+      50%       { box-shadow: 0 0 0 8px rgba(59,130,246,0.1), 0 4px 16px rgba(59,130,246,0.4); }
+    }
+
+    /* ── Toast notification ──────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--primary);
+      color: #FBF6EE;
+      padding: 12px 20px;
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(92,45,30,0.30);
+      z-index: 2000;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    .footer {
+      background: var(--surface);
+      border-top: 1px solid var(--divider);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .footer-tabs {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      cursor: pointer;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+    }
+
+    .tab.active { opacity: 1; color: var(--primary); }
+    .tab:hover { opacity: 0.8; }
+    .tab-icon { font-size: 20px; }
+    .tab-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    .footer-ornament {
+      font-family: Georgia, serif;
+      font-size: 13px;
+      color: var(--gold);
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ── Top Bar ──────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">🍞</div>
+    <div>
+      <div class="topbar-title">iBake</div>
+      <div class="topbar-subtitle">Sourdough Starter Community · Oslo</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="stat-pill">
+      <div class="stat-dot"></div>
+      <span>18 starters near you</span>
+    </div>
+    <div class="stat-pill">🌾 within 10 km</div>
+    <div class="topbar-badge">✦ Demo Mode</div>
+    <button onclick="history.back()" style="
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    ">← Back to App</button>
+  </div>
+</header>
+
+<!-- ── Main Layout ──────────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-header-row">
+        <span class="sidebar-title">Nearby Starters</span>
+        <span class="sidebar-count">18 available</span>
+      </div>
+      <div class="filter-row">
+        <div class="filter-chip active">All Types</div>
+        <div class="filter-chip">Rye</div>
+        <div class="filter-chip">Wheat</div>
+        <div class="filter-chip">Ancient</div>
+      </div>
+    </div>
+    <div class="starter-list" id="starterList"></div>
+  </aside>
+
+  <!-- Map -->
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <!-- Filter bar overlay -->
+    <div class="map-filter-bar">
+      <span class="map-filter-text">Radius</span>
+      <span class="map-filter-stat">10 km</span>
+      <div class="map-filter-sep"></div>
+      <span class="map-filter-text">Starters</span>
+      <span class="map-filter-stat">18 available</span>
+      <div class="map-filter-sep"></div>
+      <span class="map-filter-text">📍 Oslo, Norway</span>
+    </div>
+
+    <!-- FAB -->
+    <button class="map-fab" onclick="showToast('🌾 Share Starter form coming soon!')">
+      🌾 Share Starter
+    </button>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-row"><span class="legend-icon">🍞</span> Sourdough starter</div>
+      <div class="legend-row"><span class="legend-icon">🌾</span> Rye / stiff starter</div>
+      <div class="legend-row"><span class="legend-icon">🥛</span> Enriched / milk</div>
+      <div class="legend-row"><span class="legend-icon" style="font-size:11px; width:14px; height:14px; background:#3B82F6; border-radius:7px; border:2px solid white; display:inline-block;"></span> Your location</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Footer tabs (decorative) -->
+<footer class="footer">
+  <div class="footer-tabs">
+    <div class="tab active">
+      <span class="tab-icon">🗺️</span>
+      <span class="tab-label">Map</span>
+    </div>
+    <div class="tab">
+      <span class="tab-icon">📖</span>
+      <span class="tab-label">Recipes</span>
+    </div>
+    <div class="tab">
+      <span class="tab-icon">🧮</span>
+      <span class="tab-label">Tools</span>
+    </div>
+    <div class="tab">
+      <span class="tab-icon">💬</span>
+      <span class="tab-label">Messages</span>
+    </div>
+    <div class="tab">
+      <span class="tab-icon">👤</span>
+      <span class="tab-label">Profile</span>
+    </div>
+  </div>
+  <span class="footer-ornament">✦ iBake · BakSelv ✦</span>
+  <span>Demo visualization · Oslo, Norway</span>
+</footer>
+
+<script>
+// ── Starter Data ─────────────────────────────────────────────────────────────
+const STARTERS = [
+  { id: 1, name: 'Bergljot', owner: 'Lars M.', age: 2190, hydration: 75, lat: 59.9139, lng: 10.7522, dist: 0.4, emoji: '🌾', type: 'rye', desc: 'My oldest culture, named after my grandmother. Kept alive since 2018 through two moves. She thrives on whole rye and bread flour. The Viking of starters.' },
+  { id: 2, name: 'Seoulmate', owner: 'Tor A.', age: 547, hydration: 100, lat: 59.9256, lng: 10.7182, dist: 1.2, emoji: '🥛', type: 'wheat', desc: 'Liquid levain from a Seoul baking workshop. Ferments fast with a mild, sweet tang. Perfect for Korean milk breads and soft sandwich loaves.' },
+  { id: 3, name: 'Mjølner', owner: 'Kari T.', age: 365, hydration: 65, lat: 59.9405, lng: 10.6935, dist: 2.1, emoji: '🌾', type: 'rye', desc: 'Stiff rye starter named after Thor\'s hammer. 65% hydration — hits hard and lifts anything. Exclusive for dark Scandinavian breads. Almost impossible to kill.' },
+  { id: 4, name: 'Fjordkanten', owner: 'Ole J.', age: 912, hydration: 80, lat: 59.9312, lng: 10.7641, dist: 0.9, emoji: '🍞', type: 'wheat', desc: 'High-hydration wheat starter cultivated on mountain spring water. Bright, clean acidity with subtle floral notes. Exceptional for open-crumb loaves.' },
+  { id: 5, name: 'Solbrød', owner: 'Frida W.', age: 183, hydration: 100, lat: 59.9489, lng: 10.7298, dist: 1.8, emoji: '🍞', type: 'wheat', desc: 'Young but vigorous whole wheat starter — doubles in under 4 hours in summer. Great for everyday loaves with a mild, nutty flavor.' },
+  { id: 6, name: 'Bergen 1984', owner: 'Bjørn H.', age: 14600, hydration: 70, lat: 59.9070, lng: 10.7700, dist: 2.5, emoji: '🌾', type: 'rye', desc: '40-year-old Bergen culture. Survived three generations of the Haugen family. Has a deep, almost winey tang unlike any younger starter. Irreplaceable.' },
+  { id: 7, name: 'Oslo Sourdough', owner: 'Petter K.', age: 900, hydration: 100, lat: 59.9220, lng: 10.7450, dist: 0.7, emoji: '🍞', type: 'wheat', desc: 'Started when I moved to Oslo — feels like the city itself. Works beautifully for boules, batards, and sourdough pizza dough.' },
+  { id: 8, name: 'Hedmark Dark', owner: 'Gunnar R.', age: 1460, hydration: 60, lat: 59.9550, lng: 10.7100, dist: 3.2, emoji: '🌾', type: 'rye', desc: 'A very stiff rye starter from eastern Norway. Gives extraordinary depth to dark bread and keeps for up to 3 weeks in the fridge without feeding.' },
+  { id: 9, name: 'Nordic Wild', owner: 'Magnus C.', age: 730, hydration: 85, lat: 59.9380, lng: 10.6800, dist: 2.8, emoji: '🍞', type: 'wheat', desc: 'A blend of spelt, emmer, and rye — ancient grains harvested in Valdres. Nutty, slightly sweet, utterly unique. No other culture I\'ve tasted is similar.' },
+  { id: 10, name: 'Trondheim Dark', owner: 'Kristoffer B.', age: 5475, hydration: 68, lat: 59.9010, lng: 10.7350, dist: 3.5, emoji: '🌾', type: 'rye', desc: 'From an old konditor in Midtbyen Trondheim — 15+ years old. Ferments slowly for a deep, caramel-like flavor. Perfect for long cold retards.' },
+  { id: 11, name: 'Rosenborg', owner: 'Silje B.', age: 270, hydration: 100, lat: 59.9190, lng: 10.7600, dist: 1.5, emoji: '🍞', type: 'wheat', desc: 'Named after the nearby park. A lively 100% hydration starter that produces a beautiful open crumb with bright lactic notes.' },
+  { id: 12, name: 'Grüner', owner: 'Emma S.', age: 410, hydration: 90, lat: 59.9290, lng: 10.7550, dist: 1.1, emoji: '🍞', type: 'wheat', desc: 'Born in Grünerløkka — the baker\'s neighborhood. High hydration, very active, slightly tangy. Perfect for sourdough focaccia.' },
+  { id: 13, name: 'Tøyen Tang', owner: 'Astrid V.', age: 620, hydration: 75, lat: 59.9110, lng: 10.7700, dist: 1.9, emoji: '🌾', type: 'rye', desc: 'A rye-wheat blend starter from Tøyen. Good balance of sourness and lift. Very reliable for beginner bakers. Forgiving of skipped feedings.' },
+  { id: 14, name: 'Hokkaido', owner: 'Ji-Yeon P.', age: 300, hydration: 100, lat: 59.9330, lng: 10.7250, dist: 0.6, emoji: '🥛', type: 'wheat', desc: 'Brought from a Japanese baking class in Hokkaido. Incredibly mild, almost sweet. Makes the fluffiest shokupan and tangzhong milk bread.' },
+  { id: 15, name: 'Frogner Classic', owner: 'Vibeke N.', age: 1825, hydration: 75, lat: 59.9180, lng: 10.6950, dist: 2.3, emoji: '🍞', type: 'wheat', desc: 'A Frogner family heirloom — 5 years of continuous feeding. Consistent performer with a wonderfully balanced flavor profile year-round.' },
+  { id: 16, name: 'Vestland Rye', owner: 'Erik N.', age: 1095, hydration: 100, lat: 59.9430, lng: 10.7400, dist: 2.0, emoji: '🌾', type: 'rye', desc: 'Western Norway rye culture — very robust and aromatic. Produces the most intensely flavored dark bread I\'ve ever tasted. Not for the faint-hearted.' },
+  { id: 17, name: 'Sagene Spelt', owner: 'Ragnhild B.', age: 480, hydration: 80, lat: 59.9470, lng: 10.7620, dist: 2.7, emoji: '🍞', type: 'wheat', desc: 'A 100% spelt starter — nutty, slightly sweet, and incredibly fragrant. Makes extraordinary spelt loaves and the best sourdough waffles.' },
+  { id: 18, name: 'Mathallen Magic', owner: 'Nora L.', age: 730, hydration: 100, lat: 59.9250, lng: 10.7520, dist: 0.5, emoji: '🍞', type: 'wheat', desc: 'Started at Mathallen food market — fed exclusively on organic flour. Has developed a complex, wine-like character from the diverse yeast environment.' },
+];
+
+// ── Map Init ─────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [59.9275, 10.7280],
+  zoom: 13,
+  zoomControl: false,
+});
+
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19,
+}).addTo(map);
+
+// User location marker
+const userIcon = L.divIcon({
+  html: '<div class="user-marker"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  className: '',
+});
+
+L.marker([59.9275, 10.7280], { icon: userIcon })
+  .addTo(map)
+  .bindTooltip('📍 Your location', { permanent: false, direction: 'top' });
+
+// Radius circle
+L.circle([59.9275, 10.7280], {
+  radius: 10000,
+  color: '#B8873A',
+  fillColor: '#B8873A',
+  fillOpacity: 0.04,
+  weight: 1.5,
+  dashArray: '6 4',
+}).addTo(map);
+
+// ── Markers & Cards ───────────────────────────────────────────────────────────
+let selectedId = null;
+const markerRefs = {};
+const cardRefs = {};
+
+function makeMarkerIcon(starter, selected = false) {
+  return L.divIcon({
+    html: `<div class="starter-marker">
+      <div class="marker-bubble${selected ? ' selected' : ''}">${starter.emoji}</div>
+      <div class="marker-tail${selected ? ' selected' : ''}"></div>
+    </div>`,
+    iconSize: [44, 56],
+    iconAnchor: [22, 54],
+    popupAnchor: [0, -54],
+    className: '',
+  });
+}
+
+function popupHTML(s) {
+  const ageYears = s.age >= 365 ? `${(s.age / 365).toFixed(1)}y` : `${s.age}d`;
+  return `
+    <div class="popup-accent"></div>
+    <div class="popup-body">
+      <div class="popup-header">
+        <div class="popup-emoji">${s.emoji}</div>
+        <div>
+          <div class="popup-name">${s.name}</div>
+          <div class="popup-owner">by ${s.owner}</div>
+        </div>
+      </div>
+      <div class="popup-stats">
+        <div class="popup-stat">
+          <div class="popup-stat-val">${ageYears}</div>
+          <div class="popup-stat-lbl">Age</div>
+        </div>
+        <div class="popup-stat">
+          <div class="popup-stat-val">${s.hydration}%</div>
+          <div class="popup-stat-lbl">Hydration</div>
+        </div>
+        <div class="popup-stat">
+          <div class="popup-stat-val">${s.dist}km</div>
+          <div class="popup-stat-lbl">Distance</div>
+        </div>
+      </div>
+      <div class="popup-desc">${s.desc}</div>
+      <button class="popup-btn" onclick="handleRequest('${s.name}', '${s.owner}')">🤝 Request This Starter</button>
+    </div>
+  `;
+}
+
+function selectStarter(id) {
+  // Deselect previous
+  if (selectedId !== null && markerRefs[selectedId]) {
+    const prev = STARTERS.find(s => s.id === selectedId);
+    markerRefs[selectedId].setIcon(makeMarkerIcon(prev, false));
+    if (cardRefs[selectedId]) cardRefs[selectedId].classList.remove('selected');
+  }
+
+  selectedId = id;
+  const starter = STARTERS.find(s => s.id === id);
+
+  if (markerRefs[id]) {
+    markerRefs[id].setIcon(makeMarkerIcon(starter, true));
+    markerRefs[id].openPopup();
+  }
+
+  if (cardRefs[id]) {
+    cardRefs[id].classList.add('selected');
+    cardRefs[id].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  map.panTo([starter.lat, starter.lng], { animate: true, duration: 0.5 });
+}
+
+// Build markers
+STARTERS.forEach(s => {
+  const marker = L.marker([s.lat, s.lng], { icon: makeMarkerIcon(s) })
+    .addTo(map)
+    .bindPopup(popupHTML(s), { maxWidth: 280, className: 'ibake-popup' });
+
+  marker.on('click', () => selectStarter(s.id));
+  marker.on('popupclose', () => {
+    if (selectedId === s.id) {
+      marker.setIcon(makeMarkerIcon(s, false));
+      if (cardRefs[s.id]) cardRefs[s.id].classList.remove('selected');
+      selectedId = null;
+    }
+  });
+
+  markerRefs[s.id] = marker;
+});
+
+// Build sidebar cards
+const list = document.getElementById('starterList');
+STARTERS.forEach(s => {
+  const ageYears = s.age >= 365 ? `${(s.age / 365).toFixed(1)} yrs` : `${s.age} days`;
+  const card = document.createElement('div');
+  card.className = 'starter-card';
+  card.id = `card-${s.id}`;
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="card-avatar">${s.emoji}</div>
+      <div class="card-info">
+        <div class="card-name">${s.name}</div>
+        <div class="card-owner">by ${s.owner}</div>
+        <div class="card-tags">
+          <span class="card-tag age">⏳ ${ageYears}</span>
+          <span class="card-tag hydration">💧 ${s.hydration}%</span>
+          <span class="card-tag">${s.type === 'rye' ? '🌑 Rye' : s.type === 'wheat' ? '🌾 Wheat' : '🥛 Enriched'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-desc">${s.desc}</div>
+    <div class="card-footer">
+      <span class="card-dist"><span class="avail-dot"></span> ${s.dist} km away · Available</span>
+      <button class="request-btn" onclick="event.stopPropagation(); handleRequest('${s.name}', '${s.owner}')">Request</button>
+    </div>
+  `;
+  card.addEventListener('click', () => selectStarter(s.id));
+  list.appendChild(card);
+  cardRefs[s.id] = card;
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function handleRequest(name, owner) {
+  showToast(`✅ Request sent to ${owner} for "${name}"!`);
+}
+
+// Filter chips (decorative)
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+
+// Auto-select first starter after short delay for demo feel
+setTimeout(() => selectStarter(1), 1200);
+</script>
+</body>
+</html>
